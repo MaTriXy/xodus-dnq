@@ -1,0 +1,99 @@
+/**
+ * Copyright 2006 - 2024 JetBrains s.r.o.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.jetbrains.teamsys.dnq.database
+
+import jetbrains.exodus.database.TransientChangesTracker
+import mu.KLogging
+import java.lang.management.ManagementFactory
+import java.util.concurrent.atomic.AtomicLong
+import javax.management.InstanceNotFoundException
+import javax.management.ObjectName
+
+private const val OBJECT_NAME_PREFIX = "com.jetbrains.teamsys.dnq: type=TransactionSizeWarning"
+private const val DEFAULT_THRESHOLD = 500
+
+class TransactionSizeWarning : TransactionSizeWarningMBean {
+
+    companion object : KLogging()
+
+    @Volatile
+    override var enabled: Boolean = false
+
+    @Volatile
+    override var warningThreshold: Int = DEFAULT_THRESHOLD
+
+    private val _warningCount = AtomicLong(0)
+    override val warningCount: Long get() = _warningCount.get()
+
+    @Volatile
+    override var lastWarningEntityCount: Int = 0
+        private set
+
+    @Volatile
+    override var lastWarningEntityTypes: String = ""
+        private set
+
+    @Volatile
+    override var lastWarningTimestamp: Long = 0
+        private set
+
+    private var registeredName: ObjectName? = null
+
+    fun register(applicationName: String) {
+        try {
+            val name = ObjectName("$OBJECT_NAME_PREFIX, app = $applicationName")
+            ManagementFactory.getPlatformMBeanServer().registerMBean(this, name)
+            registeredName = name
+        } catch (e: Exception) {
+            logger.warn(e) { "error registering TransactionSizeWarning mbean" }
+        }
+    }
+
+    fun unregister() {
+        val name = registeredName ?: return
+        try {
+            ManagementFactory.getPlatformMBeanServer().unregisterMBean(name)
+        } catch (ignore: InstanceNotFoundException) {
+        } catch (e: Exception) {
+            logger.warn(e) { "error unregistering TransactionSizeWarning mbean" }
+        }
+        registeredName = null
+    }
+
+    fun checkAndWarn(tracker: TransientChangesTracker) {
+        if (!enabled) return
+
+        val changedCount = tracker.changedEntities.size
+        if (changedCount <= warningThreshold) return
+
+        val breakdown = tracker.changedEntities
+            .groupingBy { it.type }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .joinToString { "${it.key}:${it.value}" }
+
+        _warningCount.incrementAndGet()
+        lastWarningEntityCount = changedCount
+        lastWarningEntityTypes = breakdown
+        lastWarningTimestamp = System.currentTimeMillis()
+
+        logger.warn {
+            "Transaction updates $changedCount entities (threshold: $warningThreshold). " +
+                "Entity types: [$breakdown]"
+        }
+    }
+}

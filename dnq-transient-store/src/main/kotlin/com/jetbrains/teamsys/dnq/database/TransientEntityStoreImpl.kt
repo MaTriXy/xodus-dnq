@@ -81,6 +81,8 @@ open class TransientEntityStoreImpl : TransientEntityStore {
     // fair flushLock
     internal val flushLock = ReentrantLock(true)
 
+    val transactionSizeWarning = TransactionSizeWarning()
+
     /**
      * It's guaranteed that current thread session is Open, if exists
      */
@@ -163,6 +165,7 @@ open class TransientEntityStoreImpl : TransientEntityStore {
                         }
             }
         }
+        transactionSizeWarning.unregister()
         _persistentStore.close()
         _persistentStore.environment.close()
     }

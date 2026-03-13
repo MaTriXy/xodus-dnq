@@ -517,6 +517,8 @@ class TransientSessionImpl(
             beforeFlush()
             checkBeforeSaveChangesConstraints()
 
+            store.transactionSizeWarning.checkAndWarn(transientChangesTracker)
+
             val txn = persistentTransactionInternal
             if (txn.isIdempotent) return
 
