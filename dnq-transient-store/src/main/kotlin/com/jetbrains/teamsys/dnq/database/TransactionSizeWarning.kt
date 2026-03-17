@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.management.InstanceNotFoundException
 import javax.management.ObjectName
 
-private const val OBJECT_NAME_PREFIX = "com.jetbrains.teamsys.dnq: type=TransactionSizeWarning"
+private const val OBJECT_NAME_PREFIX = "kotlinx.dnq: type=TransactionSizeWarning"
 private const val DEFAULT_THRESHOLD = 500
 
 class TransactionSizeWarning : TransactionSizeWarningMBean {
@@ -37,18 +37,6 @@ class TransactionSizeWarning : TransactionSizeWarningMBean {
 
     private val _warningCount = AtomicLong(0)
     override val warningCount: Long get() = _warningCount.get()
-
-    @Volatile
-    override var lastWarningEntityCount: Int = 0
-        private set
-
-    @Volatile
-    override var lastWarningEntityTypes: String = ""
-        private set
-
-    @Volatile
-    override var lastWarningTimestamp: Long = 0
-        private set
 
     private var registeredName: ObjectName? = null
 
@@ -87,9 +75,6 @@ class TransactionSizeWarning : TransactionSizeWarningMBean {
             .joinToString { "${it.key}:${it.value}" }
 
         _warningCount.incrementAndGet()
-        lastWarningEntityCount = changedCount
-        lastWarningEntityTypes = breakdown
-        lastWarningTimestamp = System.currentTimeMillis()
 
         logger.warn {
             "Transaction updates $changedCount entities (threshold: $warningThreshold). " +

@@ -32,19 +32,4 @@ interface TransactionSizeWarningMBean {
      * Total number of warnings emitted since the monitor was enabled.
      */
     val warningCount: Long
-
-    /**
-     * Entity count from the last warning.
-     */
-    val lastWarningEntityCount: Int
-
-    /**
-     * Per-type breakdown from the last warning, e.g. "IssueTag:800, Issue:400".
-     */
-    val lastWarningEntityTypes: String
-
-    /**
-     * Epoch millis of the last warning.
-     */
-    val lastWarningTimestamp: Long
 }
