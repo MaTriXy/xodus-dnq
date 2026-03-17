@@ -51,6 +51,7 @@ open class TransientEntityStoreImpl : TransientEntityStore {
             ec.envTxnReplayTimeout = java.lang.Long.MAX_VALUE
             ec.gcUseExclusiveTransaction = true
             _persistentStore = persistentStore
+            transactionSizeWarning.register(persistentStore.location)
         }
 
     /**
@@ -80,6 +81,8 @@ open class TransientEntityStoreImpl : TransientEntityStore {
 
     // fair flushLock
     internal val flushLock = ReentrantLock(true)
+
+    val transactionSizeWarning = TransactionSizeWarning()
 
     /**
      * It's guaranteed that current thread session is Open, if exists
@@ -163,6 +166,7 @@ open class TransientEntityStoreImpl : TransientEntityStore {
                         }
             }
         }
+        transactionSizeWarning.unregister()
         _persistentStore.close()
         _persistentStore.environment.close()
     }
