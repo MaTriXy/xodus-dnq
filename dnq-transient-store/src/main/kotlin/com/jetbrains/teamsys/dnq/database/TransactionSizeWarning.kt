@@ -24,6 +24,7 @@ import javax.management.ObjectName
 
 private const val OBJECT_NAME_PREFIX = "kotlinx.dnq: type=TransactionSizeWarning"
 private const val DEFAULT_THRESHOLD = 500
+private const val MAX_DETAILS_PER_TYPE = 10
 
 class TransactionSizeWarning : TransactionSizeWarningMBean {
 
@@ -54,7 +55,7 @@ class TransactionSizeWarning : TransactionSizeWarningMBean {
         val name = registeredName ?: return
         try {
             ManagementFactory.getPlatformMBeanServer().unregisterMBean(name)
-        } catch (ignore: InstanceNotFoundException) {
+        } catch (_: InstanceNotFoundException) {
         } catch (e: Exception) {
             logger.warn(e) { "error unregistering TransactionSizeWarning mbean" }
         }
@@ -67,18 +68,30 @@ class TransactionSizeWarning : TransactionSizeWarningMBean {
         val changedCount = tracker.changedEntities.size
         if (changedCount <= warningThreshold) return
 
-        val breakdown = tracker.changedEntities
-            .groupingBy { it.type }
-            .eachCount()
+        _warningCount.incrementAndGet()
+
+        if (!logger.isWarnEnabled) return
+
+        val entitiesByType = tracker.changedEntities.groupBy { it.type }
+
+        val breakdown = entitiesByType
+            .mapValues { it.value.size }
             .entries
             .sortedByDescending { it.value }
             .joinToString { "${it.key}:${it.value}" }
 
-        _warningCount.incrementAndGet()
+        val details = entitiesByType.entries
+            .sortedByDescending { it.value.size }
+            .joinToString("\n") { (type, entities) ->
+                val entity = entities.first()
+                val props = tracker.getChangedProperties(entity)
+                    ?.take(MAX_DETAILS_PER_TYPE)?.joinToString().orEmpty()
+                val links = tracker.getChangedLinksDetailed(entity)
+                    ?.keys?.take(MAX_DETAILS_PER_TYPE)?.joinToString().orEmpty()
+                "  $type: properties=[$props], links=[$links]"
+            }
 
-        logger.warn {
-            "Transaction updates $changedCount entities (threshold: $warningThreshold). " +
-                "Entity types: [$breakdown]"
-        }
+        logger.warn { "Transaction updates $changedCount entities (threshold: $warningThreshold). " +
+                "Entity types: [$breakdown]\n$details" }
     }
 }
