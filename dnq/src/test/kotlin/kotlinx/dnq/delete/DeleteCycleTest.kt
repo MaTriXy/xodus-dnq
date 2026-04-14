@@ -231,7 +231,7 @@ class DeleteCycleTest : DBTest() {
             for (i in 0..99) {
                 val d = Driver.query(Driver::age eq i).first()
                 println("Update $d")
-                d.name = d.name?.toUpperCase()
+                d.name = d.name?.uppercase()
             }
         }
     }
