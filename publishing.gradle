@@ -106,8 +106,8 @@ if (project.hasProperty("publishTo")) {
                 mavenJava(MavenPublication) {
                     from components.java
 
-                    artifact sourceJar {
-                        classifier 'sources'
+                    artifact(sourceJar) {
+                        classifier = 'sources'
                     }
                 }
             }
